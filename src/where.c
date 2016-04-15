@@ -4584,19 +4584,36 @@ void sqlite3WhereEnd(WhereInfo *pWInfo){
       if( pWInfo->eDistinct==WHERE_DISTINCT_ORDERED
        && (pLoop->wsFlags & WHERE_INDEXED)!=0
       ){
+        /* This is the Skip-ahead optimization.  When doing a DISTINCT query
+        ** that has WHERE_DISTINCT_ORDERED, use OP_SkipGT/OP_SkipLT to skip
+        ** over all duplicate entries, rather than visiting all duplicates
+        ** using OP_Next/OP_Prev. */
         int j, k, op;
         int r1 = pParse->nMem+1;
-        int n = 0;
+        int n = -1;
         ExprList *pX = pWInfo->pDistinctSet;
+        Index *pIdx = pLoop->u.btree.pIndex;
         for(j=0; j<pX->nExpr; j++){
           Expr *pE = sqlite3ExprSkipCollate(pX->a[j].pExpr);
-          if( pE->op==TK_COLUMN && pE->iTable==pLevel->iTabCur ) n++;
+          if( pE->op==TK_COLUMN ){
+            if( pE->iTable!=pLevel->iTabCur ) continue;
+            k = 1+sqlite3ColumnOfIndex(pIdx, pE->iColumn);
+            if( k>n ) n = k;
+          }else if( pIdx->aColExpr ){
+            for(k=n+1; k<pIdx->nKeyCol; k++){
+              Expr *pI = pIdx->aColExpr->a[k].pExpr;
+              if( pI && sqlite3ExprCompare(pE,pI,0)<2 ){
+                n = k+1;
+                break;
+              }
+            }
+          }
         }
-        for(j=0; j<n; j++){
-          sqlite3VdbeAddOp3(v, OP_Column, pLevel->iIdxCur, j, r1+j);
-        }
-        pParse->nMem += n;
         if( n>0 ){
+          for(j=0; j<n; j++){
+            sqlite3VdbeAddOp3(v, OP_Column, pLevel->iIdxCur, j, r1+j);
+          }
+          pParse->nMem += n;
           op = pLevel->op==OP_Prev ? OP_SeekLT : OP_SeekGT;
           k = sqlite3VdbeAddOp4Int(v, op, pLevel->iIdxCur, 0, r1, n);
           VdbeCoverageIf(v, op==OP_SeekLT);
@@ -4605,6 +4622,7 @@ void sqlite3WhereEnd(WhereInfo *pWInfo){
           sqlite3VdbeJumpHere(v, k);
         }
       }else{
+        /* The common case: Advance to the next row */
         sqlite3VdbeAddOp3(v, pLevel->op, pLevel->p1, pLevel->p2, pLevel->p3);
         sqlite3VdbeChangeP5(v, pLevel->p5);
         VdbeCoverage(v);
