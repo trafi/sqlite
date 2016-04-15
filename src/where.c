@@ -4581,7 +4581,9 @@ void sqlite3WhereEnd(WhereInfo *pWInfo){
     pLoop = pLevel->pWLoop;
     sqlite3VdbeResolveLabel(v, pLevel->addrCont);
     if( pLevel->op!=OP_Noop ){
-      if( pWInfo->eDistinct==WHERE_DISTINCT_ORDERED ){
+      if( pWInfo->eDistinct==WHERE_DISTINCT_ORDERED
+       && (pLoop->wsFlags & WHERE_INDEXED)!=0
+      ){
         int j, k, op;
         int r1 = pParse->nMem+1;
         int n = 0;
@@ -4594,12 +4596,14 @@ void sqlite3WhereEnd(WhereInfo *pWInfo){
           sqlite3VdbeAddOp3(v, OP_Column, pLevel->iIdxCur, j, r1+j);
         }
         pParse->nMem += n;
-        op = pLevel->op==OP_Prev ? OP_SeekLT : OP_SeekGT;
-        k = sqlite3VdbeAddOp4Int(v, op, pLevel->iIdxCur, 0, r1, n);
-        VdbeCoverageIf(v, op==OP_SeekLT);
-        VdbeCoverageIf(v, op==OP_SeekGT);
-        sqlite3VdbeAddOp2(v, OP_Goto, 1, pLevel->p2);
-        sqlite3VdbeJumpHere(v, k);
+        if( n>0 ){
+          op = pLevel->op==OP_Prev ? OP_SeekLT : OP_SeekGT;
+          k = sqlite3VdbeAddOp4Int(v, op, pLevel->iIdxCur, 0, r1, n);
+          VdbeCoverageIf(v, op==OP_SeekLT);
+          VdbeCoverageIf(v, op==OP_SeekGT);
+          sqlite3VdbeAddOp2(v, OP_Goto, 1, pLevel->p2);
+          sqlite3VdbeJumpHere(v, k);
+        }
       }else{
         sqlite3VdbeAddOp3(v, pLevel->op, pLevel->p1, pLevel->p2, pLevel->p3);
         sqlite3VdbeChangeP5(v, pLevel->p5);
