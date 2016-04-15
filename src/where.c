@@ -4587,6 +4587,7 @@ void sqlite3WhereEnd(WhereInfo *pWInfo){
       int r1 = pParse->nMem+1;
       if( pWInfo->eDistinct==WHERE_DISTINCT_ORDERED
        && (pLoop->wsFlags & WHERE_INDEXED)!=0
+       && OptimizationEnabled(db, SQLITE_SkipAhead)
       ){
         /* This is the Skip-ahead optimization.  When doing a DISTINCT query
         ** that has WHERE_DISTINCT_ORDERED, use OP_SkipGT/OP_SkipLT to skip
