@@ -746,7 +746,7 @@ static void selectInnerLoop(
   if( hasDistinct ){
     switch( pDistinct->eTnctType ){
       case WHERE_DISTINCT_ORDERED: {
-#if 0
+#if 1
         VdbeOp *pOp;            /* No longer required OpenEphemeral instr. */
         int iJump;              /* Jump destination */
         int regPrev;            /* Previous row content */
