@@ -746,6 +746,7 @@ static void selectInnerLoop(
   if( hasDistinct ){
     switch( pDistinct->eTnctType ){
       case WHERE_DISTINCT_ORDERED: {
+#if 0
         VdbeOp *pOp;            /* No longer required OpenEphemeral instr. */
         int iJump;              /* Jump destination */
         int regPrev;            /* Previous row content */
@@ -782,6 +783,7 @@ static void selectInnerLoop(
         assert( sqlite3VdbeCurrentAddr(v)==iJump || pParse->db->mallocFailed );
         sqlite3VdbeAddOp3(v, OP_Copy, regResult, regPrev, nResultCol-1);
         break;
+#endif
       }
 
       case WHERE_DISTINCT_UNIQUE: {

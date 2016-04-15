@@ -1733,7 +1733,7 @@ static void explain_data_prepare(ShellState *p, sqlite3_stmt *pSql){
     if( str_in_array(zOp, azGoto) && p2op<p->nIndent
      && (abYield[p2op] || sqlite3_column_int(pSql, 2))
     ){
-      for(i=p2op+1; i<iOp; i++) p->aiIndent[i] += 2;
+      for(i=p2op; i<iOp; i++) p->aiIndent[i] += 2;
     }
   }
 
