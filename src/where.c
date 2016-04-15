@@ -4581,6 +4581,10 @@ void sqlite3WhereEnd(WhereInfo *pWInfo){
     pLoop = pLevel->pWLoop;
     sqlite3VdbeResolveLabel(v, pLevel->addrCont);
     if( pLevel->op!=OP_Noop ){
+#ifndef SQLITE_DISABLE_SKIPAHEAD_DISTINCT
+      int n = -1;
+      int j, k, op;
+      int r1 = pParse->nMem+1;
       if( pWInfo->eDistinct==WHERE_DISTINCT_ORDERED
        && (pLoop->wsFlags & WHERE_INDEXED)!=0
       ){
@@ -4588,9 +4592,6 @@ void sqlite3WhereEnd(WhereInfo *pWInfo){
         ** that has WHERE_DISTINCT_ORDERED, use OP_SkipGT/OP_SkipLT to skip
         ** over all duplicate entries, rather than visiting all duplicates
         ** using OP_Next/OP_Prev. */
-        int j, k, op;
-        int r1 = pParse->nMem+1;
-        int n = -1;
         ExprList *pX = pWInfo->pDistinctSet;
         Index *pIdx = pLoop->u.btree.pIndex;
         for(j=0; j<pX->nExpr; j++){
@@ -4609,19 +4610,21 @@ void sqlite3WhereEnd(WhereInfo *pWInfo){
             }
           }
         }
-        if( n>0 ){
-          for(j=0; j<n; j++){
-            sqlite3VdbeAddOp3(v, OP_Column, pLevel->iIdxCur, j, r1+j);
-          }
-          pParse->nMem += n;
-          op = pLevel->op==OP_Prev ? OP_SeekLT : OP_SeekGT;
-          k = sqlite3VdbeAddOp4Int(v, op, pLevel->iIdxCur, 0, r1, n);
-          VdbeCoverageIf(v, op==OP_SeekLT);
-          VdbeCoverageIf(v, op==OP_SeekGT);
-          sqlite3VdbeAddOp2(v, OP_Goto, 1, pLevel->p2);
-          sqlite3VdbeJumpHere(v, k);
+      }
+      if( n>0 ){
+        for(j=0; j<n; j++){
+          sqlite3VdbeAddOp3(v, OP_Column, pLevel->iIdxCur, j, r1+j);
         }
-      }else{
+        pParse->nMem += n;
+        op = pLevel->op==OP_Prev ? OP_SeekLT : OP_SeekGT;
+        k = sqlite3VdbeAddOp4Int(v, op, pLevel->iIdxCur, 0, r1, n);
+        VdbeCoverageIf(v, op==OP_SeekLT);
+        VdbeCoverageIf(v, op==OP_SeekGT);
+        sqlite3VdbeAddOp2(v, OP_Goto, 1, pLevel->p2);
+        sqlite3VdbeJumpHere(v, k);
+      }else
+#endif /* SQLITE_DISABLE_SKIPAHEAD_DISTINCT */
+      {
         /* The common case: Advance to the next row */
         sqlite3VdbeAddOp3(v, pLevel->op, pLevel->p1, pLevel->p2, pLevel->p3);
         sqlite3VdbeChangeP5(v, pLevel->p5);
